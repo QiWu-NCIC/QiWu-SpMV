@@ -99,4 +99,5 @@ We welcome contributions! Here's how to get started:
 1. Fork the repository.
 2. Implement your code with cpp/CUDA/HIP/..., e.g. the spmv\_opt.cpp
 3. Compile the project. See Quick Start.
-4. Open a new branch and push the codes and results to the new branch.
+4. Run the project. See Basic Usage.
+5. Open a new branch and push the codes and results to the new branch.
