@@ -32,8 +32,8 @@ A complete toolkit for automating Sparse Matrix-Vector Multiplication (SpMV) ben
 ### 1. Clone and Setup
 
 ```
-git clone -b spmv-benchmark https://github.com/QiWu-NCIC/QiWu-SpMV.git
-cd spmv-benchmark
+git clone https://github.com/QiWu-NCIC/QiWu-SpMV.git
+cd QiWu-SpMV
 mkdir build
 cd build
 cmake ..
@@ -43,7 +43,7 @@ cmake ..
 
 ```
 #1. Enter the Root of Benchmark
-cd spmv-benchmark
+cd QiWu-SpMV
 
 # 2. Run benchmarks on all .mtx files
 python auto-spmvbenchmark.py path_to_mtx_folder your_kernel_name
@@ -98,6 +98,6 @@ We welcome contributions! Here's how to get started:
 
 1. Fork the repository.
 2. Implement your code with cpp/CUDA/HIP/..., e.g. the spmv\_opt.cpp
-3. Compile the project. See Quick Start.
+3. Modified CMakeList and recompile the project. See Quick Start.
 4. Run the project. See Basic Usage.
-5. Open a new branch and push the codes and results to the new branch.
+5. Open a new branch (e.g. the branch of opt-with-unroll) and push the codes, machine infomation and results(.csv) to the new branch.
