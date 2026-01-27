@@ -32,7 +32,7 @@ A complete toolkit for automating Sparse Matrix-Vector Multiplication (SpMV) ben
 ### 1. Clone and Setup
 
 ```
-git clone https://github.com/QiWu-NCIC/spmv-benchmark.git
+git clone -b spmv-benchmark https://github.com/QiWu-NCIC/QiWu-SpMV.git
 cd spmv-benchmark
 mkdir build
 cd build
