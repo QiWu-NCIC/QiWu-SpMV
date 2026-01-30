@@ -2,47 +2,78 @@ import subprocess
 import os
 import sys
 from datetime import datetime
+import argparse
 
-def run_cpp_benchmark(folder_path, user_string):
-    # 1. check path valid
+def run_cpp_benchmark(folder_path, user_string, executable_name):
+    # 1. Check path valid
     if not os.path.isdir(folder_path):
-        print(f"Error: path '{folder_path}' invalid")
-        return
+        print(f"Error: path '{folder_path}' is not a valid directory", file=sys.stderr)
+        return False
 
-    # 2. get all .mtx 
+    # 2. Get all .mtx files
     mtx_files = [f for f in os.listdir(folder_path) if f.endswith('.mtx')]
-    
     if not mtx_files:
-        print("Not Found .mtx file")
-        return
+        print("No .mtx files found in the specified directory.", file=sys.stderr)
+        return False
 
-    # 3. run benchmark
-    cpp_executable = "./build/spmvBenchmark" 
-    # system time in second
+    # 3. Construct full executable path
+    cpp_executable = os.path.join("build", executable_name)
+    if not os.path.isfile(cpp_executable):
+        print(f"Error: executable '{cpp_executable}' not found", file=sys.stderr)
+        return False
+
+    # Generate report name with timestamp
     current_time = datetime.now().strftime("%Y%m%d%H%M%S")
-    report_name = "spmv-test-"+current_time
+    report_name = f"spmv-test-{current_time}"
 
+    print(f"Running benchmark using: {cpp_executable}")
+    print(f"Output report prefix: {report_name}")
+    print("-" * 50)
+
+    success_count = 0
     for mtx in mtx_files:
-        mtx_path = os.path.join(folder_path, mtx)     
-        # exe: ./executable [mtx_path] [user_string] [current_time]
+        mtx_path = os.path.join(folder_path, mtx)
         command = [cpp_executable, mtx_path, user_string, report_name]
-        
         print(f"Processing: {mtx} ...")
-        
         try:
-            # exe and wait
             result = subprocess.run(command, check=True, text=True, capture_output=True)
-            
+            success_count += 1
         except subprocess.CalledProcessError as e:
-            print(f"File {mtx} ERROR: {e}")
-            # print(e.stderr)
+            print(f" ❌ Failed on {mtx}: {e}", file=sys.stderr)
+            # Uncomment below to see stderr output
+            # print(f"   stderr: {e.stderr}", file=sys.stderr)
+
+    print("-" * 50)
+    print(f"✅ Completed: {success_count}/{len(mtx_files)} matrices processed.")
+    return True
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog='auto-spmvbenchmark.py',
+        description='Automatically run SpMV benchmark on all .mtx files in a directory.',
+        epilog='Example: python auto-spmvbenchmark.py ./matrices unroll_cpu spmvBenchmark_cpu'
+    )
+
+    parser.add_argument(
+        'mtx_dir',
+        help='Path to directory containing .mtx matrix files'
+    )
+    parser.add_argument(
+        'kernel_name',
+        help='Name for the SpMV implememtation'
+    )
+    parser.add_argument(
+        'executable',
+        nargs='?',
+        default='spmvBenchmark',
+        help='Name of the compiled executable (default: spmvBenchmark). '
+             'Common options: spmvBenchmark_cpu, spmvBenchmark_cuda, spmvBenchmark_unified'
+    )
+
+    args = parser.parse_args()
+
+    success = run_cpp_benchmark(args.mtx_dir, args.kernel_name, args.executable)
+    sys.exit(0 if success else 1)
 
 if __name__ == "__main__":
-    # parameters
-    # python auto-spmvbenchmark.py [folder_path] [user_string]
-    if len(sys.argv) < 3:
-        print("Usage: python auto-spmvbenchmark.py <path/to/your/mtx> <your/kernel/name>")
-    else:
-        path_arg = sys.argv[1]
-        string_arg = sys.argv[2]
-        run_cpp_benchmark(path_arg, string_arg)
+    main()

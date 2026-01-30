@@ -23,7 +23,7 @@ A complete toolkit for automating Sparse Matrix-Vector Multiplication (SpMV) ben
 ### Core Requirements
 
 * **Python** : 3.6 or higher
-* **C++ Compiler** : g++ 7+ or clang 5+ (for compiling your SpMV implementation)
+* **Compiler** : g++, CUDA, HIP,... (for compiling your SpMV implementation)
 * **Memory** : 2GB RAM minimum (more for large matrices)
 * **Disk** : Sufficient space for matrix files and results
 
