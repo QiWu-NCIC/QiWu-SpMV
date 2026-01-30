@@ -46,7 +46,8 @@ cmake ..
 cd QiWu-SpMV
 
 # 2. Run benchmarks on all .mtx files
-python auto-spmvbenchmark.py path_to_mtx_folder your_kernel_name
+# python auto-spmvbenchmark.py -h for help
+python auto-spmvbenchmark.py path_to_mtx_folder your_kernel_name compiled_exec_name
 
 # 3. Parse results to CSV
 python data-process.py spmv-benchmark-timestamp
