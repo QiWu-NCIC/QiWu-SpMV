@@ -44,6 +44,8 @@ public:
     void spmv_serial();
     void spmv_preprocess();
     void spmv_optimized();
+    void spmv_optimized_cuda();
+    void spmv_optimized_hip();
     std::pair<double, double> benchmark_spmv(int iterations = 5);
     bool validate_correctness();
     double calculate_performance(double spmv_time_us);
