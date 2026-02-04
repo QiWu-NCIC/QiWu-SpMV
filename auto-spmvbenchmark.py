@@ -51,7 +51,7 @@ def main():
     parser = argparse.ArgumentParser(
         prog='auto-spmvbenchmark.py',
         description='Automatically run SpMV benchmark on all .mtx files in a directory.',
-        epilog='Example: python auto-spmvbenchmark.py ./matrices unroll_cpu spmvBenchmark_cpu'
+        epilog='Example: python auto-spmvbenchmark.py ./matrices_path unroll_cpu spmvBenchmark_cpu'
     )
 
     parser.add_argument(

@@ -115,7 +115,7 @@ if(BUILD_GPU_SUPPORT AND HAS_CUDA AND CUDA_SOURCES)
     target_link_libraries(${PROJECT_NAME}_cuda PRIVATE OpenMP::OpenMP_CXX)
     target_compile_options(${PROJECT_NAME}_cuda PRIVATE
         $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -O3 -DNDEBUG>
-        $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3 --compiler-options -Wall>
+        $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3 --compiler-options -Wall -D__CUDACC__>
     )
     target_compile_definitions(${PROJECT_NAME}_cuda PRIVATE
         CUDA_ENABLED=1
@@ -181,7 +181,7 @@ if(BUILD_UNIFIED AND (HAS_CUDA OR HAS_HIP))
     )
     if(HAS_CUDA)
         target_compile_options(${PROJECT_NAME}_unified PRIVATE
-            $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3>
+            $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3 -D__CUDACC__>
         )
         set_target_properties(${PROJECT_NAME}_unified PROPERTIES
             CUDA_ARCHITECTURES "75;80;86"

@@ -98,7 +98,7 @@ The parser extracts the following columns from benchmark reports:
 We welcome contributions! Here's how to get started:
 
 1. Fork the repository.
-2. Implement your code with cpp/CUDA/HIP/..., e.g. the spmv\_opt.cpp
-3. Modified CMakeList and recompile the project. See Quick Start.
+2. Implement your code with C++(.cpp)/CUDA(.cu)/HIP(.hip)/..., e.g. the spmv\_opt.cpp
+3. Modified CMakeList (if necessary) and recompile the project. See Quick Start.
 4. Run the project. See Basic Usage.
-5. Open a new branch (e.g. the branch of opt-with-unroll) and push the codes, machine infomation and results(.csv) to the new branch.
+5. Open a new branch (e.g. the branch of opt-with-avx512) and push the codes, machine infomation and results(.csv) to the new branch.

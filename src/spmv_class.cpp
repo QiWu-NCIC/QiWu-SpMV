@@ -1,5 +1,7 @@
 #include "spmv_benchmark.h"
+#include "spmv_device_interface.h"
 #include <string>
+
 using namespace std;
 
 void SpMV_Benchmark::generate_report_filename() {
@@ -19,9 +21,11 @@ void SpMV_Benchmark::generate_report_filename() {
 }
 
 SpMV_Benchmark::SpMV_Benchmark(int size, int nnz_pr) : n(size), nnz_per_row(nnz_pr) {
-    // generate_report_filename();
     initialize_matrix();
     initialize_vectors();
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    allocate_memory();
+#endif
 }
 
 SpMV_Benchmark::SpMV_Benchmark(const std::string& mtx_file) {
@@ -44,6 +48,9 @@ SpMV_Benchmark::SpMV_Benchmark(const std::string& mtx_file) {
     // generate_report_filename();
     load_matrix_from_mtx(mtx_file);
     initialize_vectors();
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    allocate_memory();
+#endif
 }
 
 void SpMV_Benchmark::load_matrix_from_mtx(const std::string& filename) {
@@ -136,6 +143,34 @@ void SpMV_Benchmark::convert_coo_to_csr(const std::vector<int>& coo_rows,
     nnz_per_row = nnz / n;
 }
 
+void SpMV_Benchmark::allocate_memory() {
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    // 使用封装的接口，而不是直接调用 CUDA API
+    d_values = static_cast<double*>(allocate_device_memory(values.size() * sizeof(double)));
+    d_col_idx = static_cast<int*>(allocate_device_memory(col_idx.size() * sizeof(int)));
+    d_row_ptr = static_cast<int*>(allocate_device_memory(row_ptr.size() * sizeof(int)));
+    d_x = static_cast<double*>(allocate_device_memory(x.size() * sizeof(double)));
+    d_y = static_cast<double*>(allocate_device_memory(y.size() * sizeof(double)));
+
+    copy_host_to_device(d_values, values.data(), values.size() * sizeof(double));
+    copy_host_to_device(d_col_idx, col_idx.data(), col_idx.size() * sizeof(int));
+    copy_host_to_device(d_row_ptr, row_ptr.data(), row_ptr.size() * sizeof(int));
+    copy_host_to_device(d_x, x.data(), x.size() * sizeof(double));
+    memset_device(d_y, 0, y.size() * sizeof(double));
+#endif
+}
+
+void SpMV_Benchmark::free_memory() {
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    // Free device memory
+    if (d_values) free_device_memory(d_values);
+    if (d_col_idx) free_device_memory(d_col_idx);
+    if (d_row_ptr) free_device_memory(d_row_ptr);
+    if (d_x) free_device_memory(d_x);
+    if (d_y) free_device_memory(d_y);
+#endif
+}
+
 void SpMV_Benchmark::initialize_matrix() {
     // Create sparse matrix - CSR format
     row_ptr.resize(n + 1);
@@ -196,14 +231,14 @@ void SpMV_Benchmark::spmv_serial() {
     }
 }
 
-void SpMV_Benchmark::spmv_preprocess() {
-    // Preprocessing function - users can add their own preprocessing operations here
-    std::cout << "Executing preprocessing steps..." << std::endl;
-    
-    // Example preprocessing operations:
-    // 1. Reorder matrix rows for better cache efficiency
-    // 2. Pre-calculate some intermediate results
-    // 3. Initialize data structures required for parallel computation
+void SpMV_Benchmark::run_spmv_kernel() {
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    spmv_optimized_cuda();
+#elif defined(HIP_ENABLED) && HIP_ENABLED
+    spmv_optimized_hip();
+#else
+    spmv_optimized();
+#endif
 }
 
 std::pair<double, double> SpMV_Benchmark::benchmark_spmv(int iterations) {
@@ -217,7 +252,7 @@ std::pair<double, double> SpMV_Benchmark::benchmark_spmv(int iterations) {
     auto spmv_start = std::chrono::high_resolution_clock::now();
     
     for (int iter = 0; iter < iterations; ++iter) {
-        spmv_optimized();
+        run_spmv_kernel();
     }
     
     auto spmv_end = std::chrono::high_resolution_clock::now();
@@ -235,8 +270,16 @@ bool SpMV_Benchmark::validate_correctness() {
     spmv_serial();  // Calculate reference result
     
     // Re-execute optimized version to get result to be validated
-    spmv_optimized();
-    
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    memset_device(d_y, 0, y.size() * sizeof(double));
+#endif
+    run_spmv_kernel();
+
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    // Copy result back to host
+    copy_host_to_device(y.data(), d_y, y.size() * sizeof(double));
+    free_memory();
+#endif
     // Calculate L2 norm relative error
     double diff_norm = 0.0;  // Square of difference vector L2 norm
     double ref_norm = 0.0;   // Square of reference vector L2 norm

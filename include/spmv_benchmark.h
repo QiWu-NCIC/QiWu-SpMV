@@ -28,6 +28,15 @@ private:
     std::string input_filename;
     std::string kernel_name;
 
+#if CUDA_ENABLED || HIP_ENABLED
+    // Device pointers for CUDA
+    double *d_values;
+    int *d_col_idx;
+    int *d_row_ptr;
+    double *d_x;
+    double *d_y;
+#endif
+
     void generate_report_filename();
     void convert_coo_to_csr(const std::vector<int>& coo_rows, 
                            const std::vector<int>& coo_cols, 
@@ -41,8 +50,13 @@ public:
     void load_matrix_from_mtx(const std::string& filename);
     void initialize_matrix();
     void initialize_vectors();
+    void allocate_memory();
+    void free_memory();
+    void run_spmv_kernel();
     void spmv_serial();
     void spmv_preprocess();
+    void spmv_preprocess_cuda();
+    void spmv_preprocess_hip();
     void spmv_optimized();
     void spmv_optimized_cuda();
     void spmv_optimized_hip();
