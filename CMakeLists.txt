@@ -33,11 +33,32 @@ endif()
 find_program(HIPCC_COMPILER hipcc DOC "HIP compiler")
 if(HIPCC_COMPILER)
     set(HAS_HIP TRUE)
+    # Do NOT set CMAKE_HIP_COMPILER to hipcc wrapper; CMake 3.22+ expects HIP Clang.
     message(STATUS "Found HIP compiler: ${HIPCC_COMPILER}")
 else()
     set(HAS_HIP FALSE)
     message(WARNING "HIP compiler (hipcc) not found – HIP targets disabled")
 endif()
+
+# Add HIP Clang builtins path if available to avoid link errors like:
+# /usr/bin/ld: cannot find -lclang_rt.builtins-<arch>
+function(_add_hip_builtins_dir target_name)
+    if(NOT CMAKE_HIP_COMPILER)
+        return()
+    endif()
+    execute_process(
+        COMMAND ${CMAKE_HIP_COMPILER} --print-resource-dir
+        OUTPUT_VARIABLE _HIP_RESOURCE_DIR
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(NOT _HIP_RESOURCE_DIR)
+        return()
+    endif()
+    set(_HIP_BUILTINS_DIR "${_HIP_RESOURCE_DIR}/lib/linux")
+    if(EXISTS "${_HIP_BUILTINS_DIR}")
+        target_link_directories(${target_name} PRIVATE "${_HIP_BUILTINS_DIR}")
+    endif()
+endfunction()
 
 # ------------------------------------------------------------------
 # Collect and classify source files
@@ -132,13 +153,18 @@ endif()
 
 if(BUILD_GPU_SUPPORT AND HAS_HIP AND HIP_SOURCES)
     # Only now find HIP package (avoid polluting CPU build)
+    enable_language(HIP)
     find_package(hip REQUIRED)
+
+    # Make sure .hip sources are compiled as HIP
+    set_source_files_properties(${HIP_SOURCES} PROPERTIES LANGUAGE HIP)
 
     add_executable(${PROJECT_NAME}_hip ${CPU_SOURCES} ${HIP_SOURCES})
     target_include_directories(${PROJECT_NAME}_hip PRIVATE ${COMMON_INCLUDE_DIRS})
     target_link_libraries(${PROJECT_NAME}_hip PRIVATE OpenMP::OpenMP_CXX hip::host)
+    _add_hip_builtins_dir(${PROJECT_NAME}_hip)
     target_compile_options(${PROJECT_NAME}_hip PRIVATE
-        -Wall -Wextra -O3 -DNDEBUG
+        -Wall -Wextra -O3 -DNDEBUG -D__HIP__
     )
     target_compile_definitions(${PROJECT_NAME}_hip PRIVATE
         HIP_ENABLED=1
@@ -163,7 +189,9 @@ if(BUILD_UNIFIED AND (HAS_CUDA OR HAS_HIP))
 
     if(HAS_HIP AND HIP_SOURCES)
         list(APPEND UNIFIED_SOURCES ${HIP_SOURCES})
+        enable_language(HIP)
         find_package(hip REQUIRED)
+        set_source_files_properties(${HIP_SOURCES} PROPERTIES LANGUAGE HIP)
     endif()
 
     add_executable(${PROJECT_NAME}_unified ${UNIFIED_SOURCES})
@@ -173,11 +201,12 @@ if(BUILD_UNIFIED AND (HAS_CUDA OR HAS_HIP))
     target_link_libraries(${PROJECT_NAME}_unified PRIVATE OpenMP::OpenMP_CXX)
     if(HAS_HIP)
         target_link_libraries(${PROJECT_NAME}_unified PRIVATE hip::host)
+        _add_hip_builtins_dir(${PROJECT_NAME}_unified)
     endif()
 
     # Compile options
     target_compile_options(${PROJECT_NAME}_unified PRIVATE
-        -Wall -Wextra -O3 -DNDEBUG
+        -Wall -Wextra -O3 -DNDEBUG -D__HIP__
     )
     if(HAS_CUDA)
         target_compile_options(${PROJECT_NAME}_unified PRIVATE
@@ -237,7 +266,7 @@ message("OpenMP:               ${OpenMP_CXX_FOUND}")
 message("CUDA Support:         ${HAS_CUDA}")
 # message(STATUS "CUDA_SOURCES = ${CUDA_SOURCES}") // check if have .cu files
 message("HIP Support:          ${HAS_HIP}")
-# message(STATUS "HIP_SOURCES = ${HIP_SOURCES}")   // check if have .hip files
+message(STATUS "HIP_SOURCES = ${HIP_SOURCES}")   #// check if have .hip files
 message("")
 message("Requested Builds:")
 message("  CPU Only:           ${BUILD_CPU_ONLY}")
