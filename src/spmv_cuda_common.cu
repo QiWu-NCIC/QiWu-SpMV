@@ -1,36 +1,50 @@
 // spmv_cuda_common.cu
-#include "spmv_device_interface.h"  // 你可能需要创建这个头文件
+#include "spmv_device_interface.h"
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
 #include <cuda_runtime.h>
+#endif
 #include <cstdio>
 
 // CUDA 内存管理函数
 void* allocate_device_memory(size_t bytes) {
 #if defined(CUDA_ENABLED) && CUDA_ENABLED
     void* d_ptr = nullptr;
-    cudaMalloc(&d_ptr, bytes);
+    cudaError_t err = cudaMalloc(&d_ptr, bytes);
+    if (err != cudaSuccess) {
+        std::fprintf(stderr, "CUDA memory allocation failed: %s\n", cudaGetErrorString(err));
+        return nullptr;
+    }
     return d_ptr;
 #else
-    return NULL;
+    return nullptr;
 #endif
 }
 
 void copy_host_to_device(void* dst, const void* src, size_t bytes) {
 #if defined(CUDA_ENABLED) && CUDA_ENABLED
-    cudaMemcpy(dst, src, bytes, cudaMemcpyHostToDevice);
+    cudaError_t err = cudaMemcpy(dst, src, bytes, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) {
+        std::fprintf(stderr, "CUDA host-to-device copy failed: %s\n", cudaGetErrorString(err));
+    }
 #endif
 }
 
 void copy_device_to_host(void* dst, const void* src, size_t bytes) {
 #if defined(CUDA_ENABLED) && CUDA_ENABLED
-    cudaMemcpy(dst, src, bytes, cudaMemcpyDeviceToHost);
-
+    cudaError_t err = cudaMemcpy(dst, src, bytes, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        std::fprintf(stderr, "CUDA device-to-host copy failed: %s\n", cudaGetErrorString(err));
+    }
 #endif
 }
 
 void memset_device(void* dst, int value, size_t bytes) {
 #if defined(CUDA_ENABLED) && CUDA_ENABLED
-    cudaMemset(dst, value, bytes);
-    cudaError_t err = cudaDeviceSynchronize();
+    cudaError_t err = cudaMemset(dst, value, bytes);
+    if (err != cudaSuccess) {
+        std::fprintf(stderr, "CUDA memset failed: %s\n", cudaGetErrorString(err));
+    }
+    err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         std::fprintf(stderr, "CUDA sync failed: %s\n", cudaGetErrorString(err));
     }
@@ -39,6 +53,11 @@ void memset_device(void* dst, int value, size_t bytes) {
 
 void free_device_memory(void* ptr) {
 #if defined(CUDA_ENABLED) && CUDA_ENABLED
-    if (ptr) cudaFree(ptr);
+    if (ptr) {
+        cudaError_t err = cudaFree(ptr);
+        if (err != cudaSuccess) {
+            std::fprintf(stderr, "CUDA memory free failed: %s\n", cudaGetErrorString(err));
+        }
+    }
 #endif
 }

@@ -2,10 +2,7 @@
 #include <memory>
 
 int main(int argc, char* argv[]) {
-    // Configure test parameters
-    int matrix_size = 4096;     // Matrix size
-    int nnz_per_row = 20;       // Non-zero elements per row
-
+    
     std::string kernelname = "default_spmv";
     std::string reportfile = "";
     
@@ -28,15 +25,6 @@ int main(int argc, char* argv[]) {
         exit(0);
     }
 
-    // 使用默认的随机矩阵
-    // int matrix_size = 4096;
-    // int nnz_per_row = 20;
-    // reportfile = argv[1];
-    // std::cout << "Using randomly generated matrix:" << std::endl;
-    // std::cout << "  Size: " << matrix_size << "x" << matrix_size << std::endl;
-    // std::cout << "  NNZ per row: " << nnz_per_row << std::endl;
-    // benchmark_ptr = std::make_unique<SpMV_Benchmark>(matrix_size, nnz_per_row);
-    
     // Create benchmark object
     SpMV_Benchmark& benchmark = *benchmark_ptr;
     benchmark.set_kernel_name(kernelname);
@@ -53,12 +41,6 @@ int main(int argc, char* argv[]) {
     
     std::cout << "\nValidating correctness..." << std::endl;
     bool correct = benchmark.validate_correctness();
-    
-    std::cout << "\nAdditional metrics:" << std::endl;
-    int total_ops = matrix_size * nnz_per_row * 2;
-    std::cout << "Total operations: " << total_ops << " (multiply-adds)" << std::endl;
-    std::cout << "Memory accessed (approx): " << (matrix_size * sizeof(double) * 2 + 
-               matrix_size * nnz_per_row * (sizeof(double) + sizeof(int))) << " bytes" << std::endl;
     
     // Write detailed report
     benchmark.write_report(std::make_pair(preprocess_time, spmv_avg_time), perf_gflops, correct);

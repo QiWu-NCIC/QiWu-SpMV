@@ -3,7 +3,7 @@
 #include <cooperative_groups.h>
 using namespace std;
 
-#ifdef __CUDACC__
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
 template <int WARP_SIZE>
 __device__ __forceinline__ double warp_reduce_sum(double sum)
 {
@@ -73,7 +73,7 @@ __global__ void csr_spmv_kernel(
 void SpMV_Benchmark::spmv_preprocess_cuda() {
     // Preprocessing function - users can add their own preprocessing operations here
     std::cout << "Executing preprocessing steps..." << std::endl;
-#ifdef __CUDACC__   
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
     // Example preprocessing operations:
     // 1. Reorder matrix rows for better cache efficiency
     // 2. Pre-calculate some intermediate results
@@ -84,14 +84,14 @@ void SpMV_Benchmark::spmv_preprocess_cuda() {
 
 void SpMV_Benchmark::spmv_optimized_cuda() {
     // Optimized SpMV function for CUDA
-#ifdef __CUDACC__  
+#if defined(CUDA_ENABLED) && CUDA_ENABLED  
     // printf("in cuda kernel!!\n");
     // Configure kernel launch parameters
     int block_size = 256;
-    int grid_size = (n + block_size - 1) / block_size;
+    int grid_size = (nrows + block_size - 1) / block_size;
     
     // Launch kernel
-    csr_spmv_kernel<256, 16><<<grid_size, block_size>>>(n, d_values, d_col_idx, d_row_ptr, d_x, d_y);
+    csr_spmv_kernel<256, 16><<<grid_size, block_size>>>(nrows, d_values, d_col_idx, d_row_ptr, d_x, d_y);
     
     // Check for kernel launch errors
     cudaError_t err = cudaGetLastError();

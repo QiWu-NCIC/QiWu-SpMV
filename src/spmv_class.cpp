@@ -20,10 +20,10 @@ void SpMV_Benchmark::generate_report_filename() {
     report_filename = oss.str();
 }
 
-SpMV_Benchmark::SpMV_Benchmark(int size, int nnz_pr) : n(size), nnz_per_row(nnz_pr) {
+SpMV_Benchmark::SpMV_Benchmark(int nrows, int ncols, int nnz) : nrows(nrows), ncols(ncols), nnz(nnz) {
     initialize_matrix();
     initialize_vectors();
-#if defined(CUDA_ENABLED) && CUDA_ENABLED
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     allocate_memory();
 #endif
 }
@@ -48,7 +48,7 @@ SpMV_Benchmark::SpMV_Benchmark(const std::string& mtx_file) {
     // generate_report_filename();
     load_matrix_from_mtx(mtx_file);
     initialize_vectors();
-#if defined(CUDA_ENABLED) && CUDA_ENABLED
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     allocate_memory();
 #endif
 }
@@ -61,50 +61,212 @@ void SpMV_Benchmark::load_matrix_from_mtx(const std::string& filename) {
     }
 
     std::string line;
-    // Skip comments and read header
+    std::string object, format, field, symmetry;
+    int num_rows = 0, num_cols = 0, total_nnz = 0;
+    bool is_matrix = false, is_vector = false;
+    bool is_coordinate = false, is_array = false;
+    bool is_real = false, is_complex = false, is_integer = false, is_pattern = false;
+    bool is_general = false, is_symmetric = false, is_skew_symmetric = false, is_hermitian = false;
+
+    // Read header line
     while (std::getline(file, line)) {
-        if (line[0] != '%') {
+        if (line.substr(0, 2) == "%%") {
+            // Parse Matrix Market header
             std::istringstream iss(line);
-            iss >> n >> n; // Assuming square matrix
-            int total_nnz;
-            iss >> total_nnz;
-            
-            std::vector<int> coo_rows, coo_cols;
-            std::vector<double> coo_vals;
-            
-            // Read COO format data
-            while (std::getline(file, line)) {
-                if (line.empty()) continue;
-                
-                std::istringstream iss2(line);
-                int row, col;
-                double val;
-                iss2 >> row >> col >> val;
-                
-                // Convert to 0-based indexing
-                coo_rows.push_back(row - 1);
-                coo_cols.push_back(col - 1);
-                coo_vals.push_back(val);
-            }
-            
-            // Convert COO to CSR format
-            convert_coo_to_csr(coo_rows, coo_cols, coo_vals, n, total_nnz);
+            std::string token;
+            iss >> token; // %%MatrixMarket
+            iss >> object; // matrix or vector
+            iss >> format; // coordinate or array
+            iss >> field; // real, integer, complex, pattern
+            iss >> symmetry; // general, symmetric, skew-symmetric, Hermitian
+
+            // Set flags
+            is_matrix = (object == "matrix");
+            is_vector = (object == "vector");
+            is_coordinate = (format == "coordinate");
+            is_array = (format == "array");
+            is_real = (field == "real");
+            is_integer = (field == "integer");
+            is_complex = (field == "complex");
+            is_pattern = (field == "pattern");
+            is_general = (symmetry == "general");
+            is_symmetric = (symmetry == "symmetric");
+            is_skew_symmetric = (symmetry == "skew-symmetric");
+            is_hermitian = (symmetry == "Hermitian" || symmetry == "hermitian");
+
             break;
         }
     }
+
+    // Skip comments
+    while (std::getline(file, line)) {
+        if (line[0] != '%') {
+            // This is the size line
+            std::istringstream iss(line);
+            if (is_coordinate) {
+                iss >> num_rows >> num_cols >> total_nnz;
+            }
+            else if (is_array) {
+                iss >> num_rows >> num_cols;
+                total_nnz = num_rows * num_cols;
+            }
+            nrows = num_rows;
+            ncols = num_cols;
+            nnz = total_nnz;
+            break;
+        }
+    }
+
+    // Prepare data structures
+    std::vector<int> coo_rows, coo_cols;
+    std::vector<double> coo_vals;
+
+    if (is_vector) {
+        // Vector object
+        std::cerr << "Vector object not yet supported." << std::endl;
+        exit(1);
+    }
+    if (is_array) {
+        // Array format (dense matrix)
+        std::cerr << "Array format not yet supported." << std::endl;
+        exit(1);
+    }
+    if (is_complex) {
+        // Warning: complex storage not fully implemented
+        std::cerr << "Warning: Complex field detected. Imaginary part will be ignored." << std::endl;
+    }
+
+    if (is_matrix && is_coordinate) {
+        // Read coordinate format data
+        for (int i = 0; i < total_nnz; ++i) {
+            if (!std::getline(file, line)) break;
+            if (line.empty()) continue;
+
+            std::istringstream iss(line);
+            int row, col;
+            double real_val = 0.0, imag_val = 0.0;
+
+            // Determine field type and read values accordingly
+            if (is_real) {
+                iss >> row >> col >> real_val;
+            }
+            else if (is_integer) {
+                int int_val;
+                iss >> row >> col >> int_val;
+                real_val = static_cast<double>(int_val);
+            }
+            else if (is_pattern) {
+                iss >> row >> col;
+                real_val = 1.0; // Default value for pattern
+            }
+            else if (is_complex) {
+                iss >> row >> col >> real_val >> imag_val;
+            }
+
+            // Convert to 0-based indexing
+            row--;
+            col--;
+
+            // Nested if statements for symmetry handling
+            if (is_general){
+                // General matrix
+                coo_rows.push_back(row);
+                coo_cols.push_back(col);
+                coo_vals.push_back(real_val);
+            }
+            else if (is_symmetric) {
+                // Only lower triangle (including diagonal) is stored
+                if (row >= col) {
+                    coo_rows.push_back(row);
+                    coo_cols.push_back(col);
+                    coo_vals.push_back(real_val);
+                    // Add symmetric element if not on diagonal
+                    if (row != col) {
+                        coo_rows.push_back(col);
+                        coo_cols.push_back(row);
+                        coo_vals.push_back(real_val);
+                    }
+                }
+                else {
+                    // Error: symmetric matrix should only store lower triangle
+                    std::cerr << "Error: symmetric matrix contains upper triangle entry ("
+                              << row+1 << ", " << col+1 << "). Only lower triangle should be stored." << std::endl;
+                    exit(1);
+                }
+            }
+            else if (is_skew_symmetric) {
+                // Only lower triangle (including diagonal) is stored
+                // Diagonal must be zero
+                if (row >= col) {
+                    if (row == col) {
+                        // Diagonal: force zero
+                        real_val = 0.0;
+                    }
+                    coo_rows.push_back(row);
+                    coo_cols.push_back(col);
+                    coo_vals.push_back(real_val);
+                    // Add skew-symmetric element if not on diagonal
+                    if (row != col) {
+                        coo_rows.push_back(col);
+                        coo_cols.push_back(row);
+                        coo_vals.push_back(-real_val);
+                    }
+                }
+                else {
+                    // Error: skew-symmetric matrix should only store lower triangle
+                    std::cerr << "Error: skew-symmetric matrix contains upper triangle entry ("
+                              << row+1 << ", " << col+1 << "). Only lower triangle should be stored." << std::endl;
+                    exit(1);
+                }
+            }
+            else if (is_hermitian) {
+                // Only lower triangle (including diagonal) is stored
+                // Diagonal must be real
+                if (row >= col) {
+                    if (row == col) {
+                        // Diagonal: ensure real (ignore imag_val)
+                        imag_val = 0.0;
+                    }
+                    coo_rows.push_back(row);
+                    coo_cols.push_back(col);
+                    coo_vals.push_back(real_val); // Store real part only
+                    // Add Hermitian conjugate element if not on diagonal
+                    if (row != col) {
+                        coo_rows.push_back(col);
+                        coo_cols.push_back(row);
+                        // For Hermitian: A(j,i) = conj(A(i,j))
+                        // Since we only store real part, use real_val
+                        coo_vals.push_back(real_val);
+                    }
+                }
+                else {
+                    // Error: Hermitian matrix should only store lower triangle
+                    std::cerr << "Error: Hermitian matrix contains upper triangle entry ("
+                              << row+1 << ", " << col+1 << "). Only lower triangle should be stored." << std::endl;
+                    exit(1);
+                }
+            }
+        }
+    }
+
+    // Convert COO to CSR format
+    int expanded_nnz = coo_rows.size();
+    convert_coo_to_csr(coo_rows, coo_cols, coo_vals, nrows, expanded_nnz);
+
     file.close();
 }
 
-void SpMV_Benchmark::convert_coo_to_csr(const std::vector<int>& coo_rows, 
-                                       const std::vector<int>& coo_cols, 
+void SpMV_Benchmark::convert_coo_to_csr(const std::vector<int>& coo_rows,
+                                       const std::vector<int>& coo_cols,
                                        const std::vector<double>& coo_vals,
-                                       int dim, int nnz) {
-    n = dim;
+                                       int nrows, int nnz) {
+    this->nrows = nrows;
+    this->nnz = nnz;
     
     // Initialize CSR structures
     values.resize(nnz);
     col_idx.resize(nnz);
-    row_ptr.resize(n + 1, 0);
+    row_ptr.resize(nrows + 1, 0);
     
     // Count number of elements in each row
     for (int i = 0; i < nnz; i++) {
@@ -112,7 +274,7 @@ void SpMV_Benchmark::convert_coo_to_csr(const std::vector<int>& coo_rows,
     }
     
     // Compute prefix sum to get row pointers
-    for (int i = 1; i <= n; i++) {
+    for (int i = 1; i <= nrows; i++) {
         row_ptr[i] += row_ptr[i - 1];
     }
     
@@ -139,12 +301,10 @@ void SpMV_Benchmark::convert_coo_to_csr(const std::vector<int>& coo_rows,
         col_idx[insert_pos] = coo_cols[i];
     }
     
-    // Recalculate nnz_per_row as average
-    nnz_per_row = nnz / n;
 }
 
 void SpMV_Benchmark::allocate_memory() {
-#if defined(CUDA_ENABLED) && CUDA_ENABLED
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     // 使用封装的接口，而不是直接调用 CUDA API
     d_values = static_cast<double*>(allocate_device_memory(values.size() * sizeof(double)));
     d_col_idx = static_cast<int*>(allocate_device_memory(col_idx.size() * sizeof(int)));
@@ -161,7 +321,7 @@ void SpMV_Benchmark::allocate_memory() {
 }
 
 void SpMV_Benchmark::free_memory() {
-#if defined(CUDA_ENABLED) && CUDA_ENABLED
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     // Free device memory
     if (d_values) free_device_memory(d_values);
     if (d_col_idx) free_device_memory(d_col_idx);
@@ -173,48 +333,62 @@ void SpMV_Benchmark::free_memory() {
 
 void SpMV_Benchmark::initialize_matrix() {
     // Create sparse matrix - CSR format
-    row_ptr.resize(n + 1);
-    int total_nnz = n * nnz_per_row;
+    row_ptr.resize(nrows + 1);
+    int total_nnz = nnz;
     values.resize(total_nnz);
     col_idx.resize(total_nnz);
 
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> val_dis(-1.0, 1.0);
-    std::uniform_int_distribution<> col_dis(0, n - 1);
+    std::uniform_int_distribution<> col_dis(0, ncols - 1);
 
     int nnz_count = 0;
-    for (int i = 0; i < n; ++i) {
+    int avg_nnz_per_row = (nrows > 0) ? nnz / nrows : 0;
+    int remainder = (nrows > 0) ? nnz % nrows : 0;
+
+    for (int i = 0; i < nrows; ++i) {
         row_ptr[i] = nnz_count;
-        
+
+        // Calculate number of non-zeros for this row
+        int nnz_this_row = avg_nnz_per_row;
+        if (i < remainder) {
+            nnz_this_row++;
+        }
+
         // Generate unique column indices for each row
         std::vector<int> temp_cols;
-        for (int j = 0; j < nnz_per_row; ++j) {
+        for (int j = 0; j < nnz_this_row; ++j) {
             int col;
             do {
                 col = col_dis(gen);
             } while (std::find(temp_cols.begin(), temp_cols.end(), col) != temp_cols.end());
-            
+
             temp_cols.push_back(col);
             col_idx[nnz_count] = col;
             values[nnz_count] = val_dis(gen);
             nnz_count++;
         }
     }
-    row_ptr[n] = nnz_count;
+    row_ptr[nrows] = nnz_count;
 }
 
 void SpMV_Benchmark::initialize_vectors() {
-    x.resize(n);
-    y.resize(n);
-    reference_y.resize(n);
+    x.resize(ncols);
+    y.resize(nrows);
+    reference_y.resize(nrows);
     
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<> dis(0.0, 1.0);
     
-    for (int i = 0; i < n; ++i) {
+    // Initialize input vector x (size ncols)
+    for (int i = 0; i < ncols; ++i) {
         x[i] = dis(gen);
+    }
+
+    // Initialize output vector y and reference vector (size nrows)
+    for (int i = 0; i < nrows; ++i) {
         y[i] = 0.0;
         reference_y[i] = 0.0;
     }
@@ -222,7 +396,7 @@ void SpMV_Benchmark::initialize_vectors() {
 
 void SpMV_Benchmark::spmv_serial() {
     // Single-threaded CSR format SpMV calculation (for reference)
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < nrows; ++i) {
         double sum = 0.0;
         for (int j = row_ptr[i]; j < row_ptr[i + 1]; ++j) {
             sum += values[j] * x[col_idx[j]];
@@ -270,21 +444,20 @@ bool SpMV_Benchmark::validate_correctness() {
     spmv_serial();  // Calculate reference result
     
     // Re-execute optimized version to get result to be validated
-#if defined(CUDA_ENABLED) && CUDA_ENABLED
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     memset_device(d_y, 0, y.size() * sizeof(double));
 #endif
     run_spmv_kernel();
 
-#if defined(CUDA_ENABLED) && CUDA_ENABLED
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     // Copy result back to host
-    copy_host_to_device(y.data(), d_y, y.size() * sizeof(double));
+    copy_device_to_host(y.data(), d_y, y.size() * sizeof(double));
     free_memory();
 #endif
     // Calculate L2 norm relative error
     double diff_norm = 0.0;  // Square of difference vector L2 norm
     double ref_norm = 0.0;   // Square of reference vector L2 norm
-    
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < nrows; ++i) {
         double diff = y[i] - reference_y[i];
         diff_norm += diff * diff;
         ref_norm += reference_y[i] * reference_y[i];
@@ -309,19 +482,24 @@ bool SpMV_Benchmark::validate_correctness() {
 
 double SpMV_Benchmark::calculate_performance(double spmv_time_us) {
     // Calculate performance metric: GFLOPS
-    int total_ops = n * nnz_per_row * 2;  // One multiplication and one addition per non-zero element
+    int total_ops = nnz * 2;  // One multiplication and one addition per non-zero element
     double time_seconds = spmv_time_us / 1e6;
     double gflops = (total_ops / time_seconds) / 1e9;
     return gflops;
 }
 
 void SpMV_Benchmark::print_matrix_info() {
-    int total_nnz = n * nnz_per_row;
+    int total_nnz = nnz;
+    int avg_nnz_per_row = (nrows > 0) ? nnz / nrows : 0;
     std::cout << "Matrix Name: " << input_filename << std::endl;
-    std::cout << "Matrix Size: " << n << "x" << n << std::endl;
-    std::cout << "Non-zeros per row: " << nnz_per_row << std::endl;
+    std::cout << "Matrix Size: " << nrows << "x" << ncols << std::endl;
+    std::cout << "Non-zeros per row: " << avg_nnz_per_row << std::endl;
     std::cout << "Total non-zeros: " << total_nnz << std::endl;
-    std::cout << "Sparsity: " << 1.0 - (double)total_nnz / (n * n) << std::endl;
+    double sparsity = 0.0;
+    if (nrows * ncols > 0) {
+        sparsity = 1.0 - (double)total_nnz / (nrows * ncols);
+    }
+    std::cout << "Sparsity: " << sparsity << std::endl;
 }
 
 void SpMV_Benchmark::set_kernel_name(const std::string& kernelname) {
@@ -341,17 +519,22 @@ void SpMV_Benchmark::write_report(std::pair<double, double> timing_results, doub
         return;
     }
 
-    int total_nnz = n * nnz_per_row;
-    
+    int total_nnz = nnz;
+    int avg_nnz_per_row = (nrows > 0) ? nnz / nrows : 0;
+
     report_file << "SpMV Benchmark Report\n";
     report_file << "=====================\n";
     report_file << "Date: " << std::asctime(std::localtime(new std::time_t(std::time(nullptr)))) << "\n";
     report_file << "Matrix Information:\n";
     report_file << "  Name: " << input_filename << "\n";
-    report_file << "  Size: " << n << "x" << n << "\n";
-    report_file << "  Non-zeros per row: " << nnz_per_row << "\n";
+    report_file << "  Size: " << nrows << "x" << ncols << "\n";
+    report_file << "  Non-zeros per row: " << avg_nnz_per_row << "\n";
     report_file << "  Total non-zeros: " << total_nnz << "\n";
-    report_file << "  Sparsity: " << 1.0 - (double)total_nnz / (n * n) << "\n\n";
+    double sparsity = 0.0;
+    if (nrows * ncols > 0) {
+        sparsity = 1.0 - (double)total_nnz / (nrows * ncols);
+    }
+    report_file << "  Sparsity: " << sparsity << "\n\n";
     
     report_file << "Benchmark Results:\n";
     report_file << "  Kernel: " << kernel_name << "\n";
@@ -359,11 +542,11 @@ void SpMV_Benchmark::write_report(std::pair<double, double> timing_results, doub
     report_file << "  Average SpMV execution time: " << timing_results.second << " microseconds\n";
     report_file << "  Performance: " << perf_gflops << " GFLOPS\n\n";
     
-    int total_ops = n * nnz_per_row * 2;
+    int total_ops = nnz * 2;
     report_file << "Additional Metrics:\n";
     report_file << "  Total operations: " << total_ops << " (multiply-adds)\n";
-    report_file << "  Memory accessed (approx): " << 
-               (n * sizeof(double) * 2 + n * nnz_per_row * (sizeof(double) + sizeof(int))) << " bytes\n\n";
+    report_file << "  Memory accessed (approx): " <<
+               ((ncols + nrows) * sizeof(double) + nnz * (sizeof(double) + sizeof(int))) << " bytes\n\n";
     
     report_file << "Correctness Validation:\n";
     report_file << "  Result: " << (correct ? "PASSED" : "FAILED") << "\n\n";
