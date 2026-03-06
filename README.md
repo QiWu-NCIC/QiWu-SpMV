@@ -37,6 +37,7 @@ cd QiWu-SpMV
 mkdir build
 cd build
 cmake ..
+make all
 ```
 
 ### 2. Basic Usage

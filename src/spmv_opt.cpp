@@ -24,7 +24,7 @@ void SpMV_Benchmark::spmv_optimized() {
     if (num_threads == 0) num_threads = 4; // Default to 4 threads if detection fails
     
     vector<thread> threads;
-    int rows_per_thread = n / num_threads;
+    int rows_per_thread = nrows / num_threads;
     
     auto spmv_worker = [&](int start_row, int end_row) {
         for (int i = start_row; i < end_row; ++i) {
@@ -72,7 +72,7 @@ void SpMV_Benchmark::spmv_optimized() {
     // Create and launch threads
     for (int t = 0; t < num_threads; ++t) {
         int start = t * rows_per_thread;
-        int end = (t == num_threads - 1) ? n : (t + 1) * rows_per_thread;
+        int end = (t == num_threads - 1) ? nrows : (t + 1) * rows_per_thread;
         threads.emplace_back(spmv_worker, start, end);
     }
     

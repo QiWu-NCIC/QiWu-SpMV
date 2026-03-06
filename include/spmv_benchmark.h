@@ -16,8 +16,9 @@
 
 class SpMV_Benchmark {
 private:
-    int n;                      // Matrix dimension
-    int nnz_per_row;           // Non-zero elements per row
+    int nrows;                  // Number of rows
+    int ncols;                  // Number of columns
+    int nnz;                    // Total number of non-zero elements
     std::vector<double> values; // Matrix values
     std::vector<int> col_idx;   // Column indices
     std::vector<int> row_ptr;   // Row pointers
@@ -28,8 +29,8 @@ private:
     std::string input_filename;
     std::string kernel_name;
 
-#if CUDA_ENABLED || HIP_ENABLED
-    // Device pointers for CUDA
+#if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
+    // Device pointers for CUDA/HIP
     double *d_values;
     int *d_col_idx;
     int *d_row_ptr;
@@ -41,10 +42,10 @@ private:
     void convert_coo_to_csr(const std::vector<int>& coo_rows, 
                            const std::vector<int>& coo_cols, 
                            const std::vector<double>& coo_vals,
-                           int dim, int nnz);
+                           int nrows, int nnz);
 
 public:
-    SpMV_Benchmark(int size, int nnz_pr);
+    SpMV_Benchmark(int nrows, int ncols, int nnz);
     SpMV_Benchmark(const std::string& mtx_file);
 
     void load_matrix_from_mtx(const std::string& filename);

@@ -164,7 +164,7 @@ if(BUILD_GPU_SUPPORT AND HAS_HIP AND HIP_SOURCES)
     target_link_libraries(${PROJECT_NAME}_hip PRIVATE OpenMP::OpenMP_CXX hip::host)
     _add_hip_builtins_dir(${PROJECT_NAME}_hip)
     target_compile_options(${PROJECT_NAME}_hip PRIVATE
-        -Wall -Wextra -O3 -DNDEBUG -D__HIP__
+        -Wall -Wextra -O3 -DNDEBUG -D__HIP__ -fPIC
     )
     target_compile_definitions(${PROJECT_NAME}_hip PRIVATE
         HIP_ENABLED=1
@@ -206,7 +206,7 @@ if(BUILD_UNIFIED AND (HAS_CUDA OR HAS_HIP))
 
     # Compile options
     target_compile_options(${PROJECT_NAME}_unified PRIVATE
-        -Wall -Wextra -O3 -DNDEBUG -D__HIP__
+        -Wall -Wextra -O3 -DNDEBUG -D__HIP__ -fPIC
     )
     if(HAS_CUDA)
         target_compile_options(${PROJECT_NAME}_unified PRIVATE
