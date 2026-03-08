@@ -31,26 +31,32 @@ SpMV_Benchmark::SpMV_Benchmark(int nrows, int ncols, int nnz) : nrows(nrows), nc
 SpMV_Benchmark::SpMV_Benchmark(const std::string& mtx_file) {
     // 1. 查找最后一个斜杠（/）的位置
     size_t lastSlashPos = mtx_file.find_last_of('/');
-    
+
     // 2. 处理边界情况
     if (mtx_file.empty()) {  // 空字符串直接返回空
         input_filename = "";
     }
-    if (lastSlashPos == string::npos) {  // 没有找到斜杠（直接是文件名）
+    else if (lastSlashPos == string::npos) {  // 没有找到斜杠（直接是文件名）
         input_filename = mtx_file;
     }
-    if (lastSlashPos == mtx_file.length() - 1) {  // 斜杠在末尾（无文件名）
+    else if (lastSlashPos == mtx_file.length() - 1) {  // 斜杠在末尾（无文件名）
         input_filename = "";
     }
-    
-    // 3. 截取从斜杠下一位到末尾的子串（即文件名+后缀）
-    input_filename = mtx_file.substr(lastSlashPos + 1);
+    else {
+        // 3. 截取从斜杠下一位到末尾的子串（即文件名+后缀）
+        input_filename = mtx_file.substr(lastSlashPos + 1);
+    }
+
     // generate_report_filename();
     load_matrix_from_mtx(mtx_file);
     initialize_vectors();
 #if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     allocate_memory();
 #endif
+}
+
+SpMV_Benchmark::~SpMV_Benchmark() {
+    free_memory();
 }
 
 void SpMV_Benchmark::load_matrix_from_mtx(const std::string& filename) {
@@ -323,11 +329,26 @@ void SpMV_Benchmark::allocate_memory() {
 void SpMV_Benchmark::free_memory() {
 #if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     // Free device memory
-    if (d_values) free_device_memory(d_values);
-    if (d_col_idx) free_device_memory(d_col_idx);
-    if (d_row_ptr) free_device_memory(d_row_ptr);
-    if (d_x) free_device_memory(d_x);
-    if (d_y) free_device_memory(d_y);
+    if (d_values) {
+        free_device_memory(d_values);
+        d_values = nullptr;
+    }
+    if (d_col_idx) {
+        free_device_memory(d_col_idx);
+        d_col_idx = nullptr;
+    }
+    if (d_row_ptr) {
+        free_device_memory(d_row_ptr);
+        d_row_ptr = nullptr;
+    }
+    if (d_x) {
+        free_device_memory(d_x);
+        d_x = nullptr;
+    }
+    if (d_y) {
+        free_device_memory(d_y);
+        d_y = nullptr;
+    }
 #endif
 }
 
@@ -524,7 +545,8 @@ void SpMV_Benchmark::write_report(std::pair<double, double> timing_results, doub
 
     report_file << "SpMV Benchmark Report\n";
     report_file << "=====================\n";
-    report_file << "Date: " << std::asctime(std::localtime(new std::time_t(std::time(nullptr)))) << "\n";
+    std::time_t now = std::time(nullptr);
+    report_file << "Date: " << std::asctime(std::localtime(&now)) << "\n";
     report_file << "Matrix Information:\n";
     report_file << "  Name: " << input_filename << "\n";
     report_file << "  Size: " << nrows << "x" << ncols << "\n";

@@ -264,9 +264,9 @@ message("Build Type:           ${CMAKE_BUILD_TYPE}")
 message("C++ Standard:         ${CMAKE_CXX_STANDARD}")
 message("OpenMP:               ${OpenMP_CXX_FOUND}")
 message("CUDA Support:         ${HAS_CUDA}")
-# message(STATUS "CUDA_SOURCES = ${CUDA_SOURCES}") // check if have .cu files
+message(STATUS "CUDA_SOURCES = ${CUDA_SOURCES}")    # check if have .cu files
 message("HIP Support:          ${HAS_HIP}")
-message(STATUS "HIP_SOURCES = ${HIP_SOURCES}")   #// check if have .hip files
+message(STATUS "HIP_SOURCES  = ${HIP_SOURCES}")     # check if have .hip files
 message("")
 message("Requested Builds:")
 message("  CPU Only:           ${BUILD_CPU_ONLY}")
