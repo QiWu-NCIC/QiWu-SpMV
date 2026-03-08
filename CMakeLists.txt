@@ -130,7 +130,7 @@ if(BUILD_GPU_SUPPORT AND HAS_CUDA AND CUDA_SOURCES)
     add_executable(${PROJECT_NAME}_cuda ${CPU_SOURCES} ${CUDA_SOURCES})
     target_include_directories(${PROJECT_NAME}_cuda PRIVATE ${COMMON_INCLUDE_DIRS})
     set_target_properties(${PROJECT_NAME}_cuda PROPERTIES
-        CUDA_ARCHITECTURES "75;80;86"  # Adjust as needed
+        CUDA_ARCHITECTURES "70;75;80;86"  # Support Volta(V100), Turing, Ampere
         CUDA_SEPARABLE_COMPILATION ON
     )
     target_link_libraries(${PROJECT_NAME}_cuda PRIVATE OpenMP::OpenMP_CXX)
@@ -213,7 +213,7 @@ if(BUILD_UNIFIED AND (HAS_CUDA OR HAS_HIP))
             $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math -O3 -D__CUDACC__>
         )
         set_target_properties(${PROJECT_NAME}_unified PROPERTIES
-            CUDA_ARCHITECTURES "75;80;86"
+            CUDA_ARCHITECTURES "70;75;80;86"
             CUDA_SEPARABLE_COMPILATION ON
         )
     endif()

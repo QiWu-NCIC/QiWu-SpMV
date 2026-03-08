@@ -55,6 +55,14 @@ python data-process.py spmv-benchmark-timestamp
 # Output: [kernel_name]_spmv_results.csv (auto-named by kernel)
 ```
 
+## 🎯 GPU Compatibility
+
+To support different GPU architectures, modify `CUDA_ARCHITECTURES` in [CMakeLists.txt](CMakeLists.txt):
+
+- **Line 133 & 216**: Update `CUDA_ARCHITECTURES` with your GPU's compute capability
+- **Common architectures**: 70(V100), 75(T4/RTX20), 80(A100), 86(RTX30)
+- **Example for Pascal GPUs**: `CUDA_ARCHITECTURES "60;61;70;75;80;86"`
+
 ## 📊 CSV Columns Extracted
 
 The parser extracts the following columns from benchmark reports:
