@@ -436,12 +436,23 @@ void SpMV_Benchmark::run_spmv_kernel() {
 #endif
 }
 
+void SpMV_Benchmark::warm_up_cache(int iterations) {
+    std::cout << "Warming up cache with " << iterations << " iterations..." << std::endl;
+    for (int i = 0; i < iterations; ++i) {
+        run_spmv_kernel();
+    }
+    std::cout << "Cache warm-up completed." << std::endl;
+}
+
 std::pair<double, double> SpMV_Benchmark::benchmark_spmv(int iterations) {
     // Timing preprocessing stage
     auto preprocess_start = std::chrono::high_resolution_clock::now();
     spmv_preprocess();
     auto preprocess_end = std::chrono::high_resolution_clock::now();
     auto preprocess_duration = std::chrono::duration_cast<std::chrono::microseconds>(preprocess_end - preprocess_start).count();
+
+    // Warm up cache before timing
+    warm_up_cache(10);
 
     // Timing SpMV execution stage
     auto spmv_start = std::chrono::high_resolution_clock::now();
