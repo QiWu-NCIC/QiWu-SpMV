@@ -62,6 +62,7 @@ public:
     void spmv_optimized();
     void spmv_optimized_cuda();
     void spmv_optimized_hip();
+    void warm_up_cache(int iterations = 10);
     std::pair<double, double> benchmark_spmv(int iterations = 10);
     bool validate_correctness();
     double calculate_performance(double spmv_time_us);
@@ -69,7 +70,6 @@ public:
     void set_kernel_name(const std::string& kernelname);
     void set_report_file(const std::string& reportfile);
     void write_report(std::pair<double, double> timing_results, double perf_gflops, bool correct);
-    void warm_up_cache(int iterations = 10);
 };
 
 #endif // SPMV_BENCHMARK_H
