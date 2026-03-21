@@ -528,8 +528,8 @@ void SpMV_Benchmark::print_matrix_info() {
     std::cout << "Non-zeros per row: " << avg_nnz_per_row << std::endl;
     std::cout << "Total non-zeros: " << total_nnz << std::endl;
     double sparsity = 0.0;
-    if (nrows * ncols > 0) {
-        sparsity = 1.0 - (double)total_nnz / (nrows * ncols);
+    if (nrows > 0 && ncols > 0) {
+        sparsity = 1.0 - (double)total_nnz / (double)nrows / (double)ncols;
     }
     std::cout << "Sparsity: " << sparsity << std::endl;
 }
@@ -564,8 +564,8 @@ void SpMV_Benchmark::write_report(std::pair<double, double> timing_results, doub
     report_file << "  Non-zeros per row: " << avg_nnz_per_row << "\n";
     report_file << "  Total non-zeros: " << total_nnz << "\n";
     double sparsity = 0.0;
-    if (nrows * ncols > 0) {
-        sparsity = 1.0 - (double)total_nnz / (nrows * ncols);
+    if (nrows > 0 && ncols > 0) {
+        sparsity = 1.0 - (double)total_nnz / (double)nrows / (double)ncols;
     }
     report_file << "  Sparsity: " << sparsity << "\n\n";
     
