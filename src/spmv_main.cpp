@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     benchmark.print_matrix_info();
     
     std::cout << "\nRunning SpMV benchmark of "<< kernelname << " with preprocessing..." << std::endl;
-    auto [preprocess_time, spmv_avg_time] = benchmark.benchmark_spmv(5);
+    auto [preprocess_time, spmv_avg_time] = benchmark.benchmark_spmv(10);
     double perf_gflops = benchmark.calculate_performance(spmv_avg_time);
     
     std::cout << "Preprocessing time: " << preprocess_time << " microseconds" << std::endl;

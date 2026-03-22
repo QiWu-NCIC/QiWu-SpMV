@@ -60,7 +60,7 @@ def main():
     )
     parser.add_argument(
         'kernel_name',
-        help='Name for the SpMV implememtation'
+        help='Name for the SpMV implementation'
     )
     parser.add_argument(
         'executable',

@@ -31,11 +31,11 @@ private:
 
 #if defined(CUDA_ENABLED) && CUDA_ENABLED || defined(HIP_ENABLED) && HIP_ENABLED
     // Device pointers for CUDA/HIP
-    double *d_values;
-    int *d_col_idx;
-    int *d_row_ptr;
-    double *d_x;
-    double *d_y;
+    double *d_values = nullptr;
+    int *d_col_idx = nullptr;
+    int *d_row_ptr = nullptr;
+    double *d_x = nullptr;
+    double *d_y = nullptr;
 #endif
 
     void generate_report_filename();
@@ -47,6 +47,7 @@ private:
 public:
     SpMV_Benchmark(int nrows, int ncols, int nnz);
     SpMV_Benchmark(const std::string& mtx_file);
+    ~SpMV_Benchmark();
 
     void load_matrix_from_mtx(const std::string& filename);
     void initialize_matrix();
@@ -61,7 +62,8 @@ public:
     void spmv_optimized();
     void spmv_optimized_cuda();
     void spmv_optimized_hip();
-    std::pair<double, double> benchmark_spmv(int iterations = 5);
+    void warm_up_cache(int iterations = 10);
+    std::pair<double, double> benchmark_spmv(int iterations = 10);
     bool validate_correctness();
     double calculate_performance(double spmv_time_us);
     void print_matrix_info();
