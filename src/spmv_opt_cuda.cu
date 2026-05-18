@@ -4,6 +4,10 @@
 using namespace std;
 
 #if defined(CUDA_ENABLED) && CUDA_ENABLED
+namespace {
+bool g_sync_after_kernel = true;
+}
+
 template <int WARP_SIZE>
 __device__ __forceinline__ double warp_reduce_sum(double sum)
 {
@@ -99,10 +103,23 @@ void SpMV_Benchmark::spmv_optimized_cuda() {
         std::cerr << "CUDA kernel launch error: " << cudaGetErrorString(err) << std::endl;
     }
     
-    // Wait for kernel to complete
-    cudaDeviceSynchronize();
+    // Wait for kernel to complete unless the benchmark loop is batching CUDA
+    // launches and synchronizing once outside the timed region.
+    if (g_sync_after_kernel) {
+        cudaDeviceSynchronize();
+    }
 #else   
     std::cerr << "CUDA not available, Exit." << std::endl;
     exit(1);
 #endif
 }
+
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+extern "C" void set_spmv_cuda_sync_enabled(int enabled) {
+    g_sync_after_kernel = (enabled != 0);
+}
+
+extern "C" void synchronize_spmv_cuda() {
+    cudaDeviceSynchronize();
+}
+#endif

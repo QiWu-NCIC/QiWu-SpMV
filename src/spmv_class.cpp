@@ -284,27 +284,14 @@ void SpMV_Benchmark::convert_coo_to_csr(const std::vector<int>& coo_rows,
         row_ptr[i] += row_ptr[i - 1];
     }
     
-    // Fill CSR arrays
+    // Fill CSR arrays. Keep an independent cursor per row so entries in the
+    // same row do not overwrite row_ptr[row].
+    std::vector<int> next_pos = row_ptr;
     for (int i = 0; i < nnz; i++) {
         int row = coo_rows[i];
-        int pos = row_ptr[row];
-        
-        // Find insertion position for sorted column indices
-        int insert_pos = pos;
-        while (insert_pos > row_ptr[row] && 
-               col_idx[insert_pos - 1] > coo_cols[i]) {
-            insert_pos--;
-        }
-        
-        // Shift elements if needed
-        for (int k = pos; k > insert_pos; k--) {
-            values[k] = values[k - 1];
-            col_idx[k] = col_idx[k - 1];
-        }
-        
-        // Insert new element
-        values[insert_pos] = coo_vals[i];
-        col_idx[insert_pos] = coo_cols[i];
+        int pos = next_pos[row]++;
+        values[pos] = coo_vals[i];
+        col_idx[pos] = coo_cols[i];
     }
     
 }
@@ -454,13 +441,23 @@ std::pair<double, double> SpMV_Benchmark::benchmark_spmv(int iterations) {
     // Warm up cache before timing
     warm_up_cache(10);
 
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    synchronize_spmv_cuda();
+    set_spmv_cuda_sync_enabled(0);
+#endif
+
     // Timing SpMV execution stage
     auto spmv_start = std::chrono::high_resolution_clock::now();
     
     for (int iter = 0; iter < iterations; ++iter) {
         run_spmv_kernel();
     }
-    
+
+#if defined(CUDA_ENABLED) && CUDA_ENABLED
+    synchronize_spmv_cuda();
+    set_spmv_cuda_sync_enabled(1);
+#endif
+
     auto spmv_end = std::chrono::high_resolution_clock::now();
     auto spmv_duration = std::chrono::duration_cast<std::chrono::microseconds>(spmv_end - spmv_start).count();
 
