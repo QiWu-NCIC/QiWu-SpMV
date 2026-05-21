@@ -14,6 +14,8 @@ void copy_host_to_device(void* dst, const void* src, size_t bytes);
 void copy_device_to_host(void* dst, const void* src, size_t bytes);
 void memset_device(void* dst, int value, size_t bytes);
 void free_device_memory(void* ptr);
+void set_spmv_cuda_sync_enabled(int enabled);
+void synchronize_spmv_cuda();
 
 // kernel 启动函数
 void launch_spmv_kernel_cuda(void* d_values, void* d_col_idx, void* d_row_ptr,
